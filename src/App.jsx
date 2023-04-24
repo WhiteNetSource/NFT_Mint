@@ -6,17 +6,16 @@ import {
   NFT_ABI,
   NFT_ADDRESS,
 } from "./web3.config";
+import axios from "axios";
 
-//const web3 = new Web3(); // 왜 밖에쓰지? 선언이라서?
-//https://rpc-mumbai.maticvigil.com 이걸 제공해 줍니다 이걸 프로바이더라고 합니다
 const web3 = new Web3(window.ethereum);
-//훅스도 아니어서 밖에 써도 무관
 const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
 const nftContract = new web3.eth.Contract(NFT_ABI, NFT_ADDRESS);
 
 function App() {
-  const [account, setAccount] = useState(""); //훅스고 함수형 컴퍼넌트라서 안에 선언해야함
-  const [myBalance, setMyBalance] = useState(); //1
+  const [account, setAccount] = useState("");
+  const [myBalance, setMyBalance] = useState();
+  const [nftMetadata, setNftMetadata] = useState();
 
   const onClickAccount = async () => {
     try {
@@ -36,29 +35,38 @@ function App() {
     try {
       if (!account || !contract) return;
 
-      //왜d가 찍힐까?
-      //조성윤 — 오늘 오후 2:48
-      //그냥 콘솔로그로 찍어도 나오는데 유즈이펙트 쓰는 이유가 있을까요?
-      //ans 가끔씩 안찍히는 경우가 있어서
-
       const balance = await contract.methods.balanceOf(account).call();
-      //const totalSupply = await contract.methods.totalSupply(account<- 이거 비워야함).call(); total은 아무런 인자를 요구하지 않음
-      setMyBalance(web3.utils.fromWei(balance)); //setMyBalance(balance); //1
+
+      setMyBalance(web3.utils.fromWei(balance));
     } catch (error) {
       console.error(error);
     }
-  }; //블록체인과 소통해야하니 비동기 함수로 받아야함 안받으면 펜딩남
+  };
   const onClickMint = async () => {
     try {
       if (!account) return;
 
       const result = await nftContract.methods
         .mintNft(
-          "https://gateway.pinata.cloud/ipfs/QmeqZF1Rkeyp1NS52KKJG9HJdUs3RxasNbYYPtrpKKvSWN"
+          "https://gateway.pinata.cloud/ipfs/QmZ5ynCXHF5LyFwehgMxQQuxrq3x1hs7zcgo1bQ2QsRCmH"
         )
-        .send({ from: account }); //send부분에 누가 발행하는지
+        .send({ from: account });
 
-      console.log(result);
+      if (!result.status) return;
+
+      const balanceOf = await nftContract.methods.balanceOf(account).call();
+
+      const tokenOfOwnerByIndex = await nftContract.methods
+        .tokenOfOwnerByIndex(account, parseInt(balanceOf) - 1)
+        .call();
+
+      const tokenURI = await nftContract.methods
+        .tokenURI(tokenOfOwnerByIndex)
+        .call();
+
+      const response = await axios.get(tokenURI);
+
+      setNftMetadata(response.data);
     } catch (error) {
       console.error(error);
     }
@@ -86,6 +94,13 @@ function App() {
             </button>
           </div>
           <div className="flex items-center mt-4">
+            {nftMetadata && (
+              <div>
+                <img src={nftMetadata.image} alt="NFT" />
+                <div>Name : {nftMetadata.name}</div>
+                <div>Description : {nftMetadata.description}</div>
+              </div>
+            )}
             <button className="ml-2 btn-style" onClick={onClickMint}>
               민팅
             </button>
@@ -104,6 +119,7 @@ function App() {
 }
 
 export default App;
+
 //return안쪽에는 에이치 티엠엘 문법이 들어감  //이 안에서 자스 코드 쓸려면 중괄호{} 표시를 해놨어요//근데 빽틱 달러 줄괄호 자바 스크립트 문법이에요//{}은 리액트 문법!  //배열 42 -4 한거임
 //반복되는스타일은 css layer component 반복되는 색상
 //사용 차이점
